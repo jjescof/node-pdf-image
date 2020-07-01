@@ -17,6 +17,7 @@ function PDFImage(pdfFilePath, options) {
   this.setConvertExtension(options.convertExtension);
   this.useGM = options.graphicsMagick || false;
   this.combinedImage = options.combinedImage || false;
+  this.sequenceConvert = options.sequenceConvert || false;
 
   this.outputDirectory = options.outputDirectory || path.dirname(pdfFilePath);
 }
@@ -133,16 +134,28 @@ PDFImage.prototype = {
       pdfImage.numberOfPages().then(function (totalPages) {
         var convertPromise = new Promise(function (resolve, reject){
           var imagePaths = [];
-          for (var i = 0; i < totalPages; i++) {
-            pdfImage.convertPage(i).then(function(imagePath){
+          if (pdfImage.sequenceConvert) {
+            function recursiveCall(imagePath) {
               imagePaths.push(imagePath);
-              if (imagePaths.length === parseInt(totalPages)){
-                imagePaths.sort(); //because of asyc pages we have to reSort pages
+              if (imagePaths.length === parseInt(totalPages)) {
                 resolve(imagePaths);
-              }
-            }).catch(function(error){
-              reject(error);
-            });
+               } else {
+                pdfImage.convertPage(imagePaths.length).then(recursiveCall, reject);
+               }
+            }
+            pdfImage.convertPage(0).then(recursiveCall, reject);
+          } else {
+            for (var i = 0; i < totalPages; i++) {
+              pdfImage.convertPage(i).then(function(imagePath){
+                imagePaths.push(imagePath);
+                if (imagePaths.length === parseInt(totalPages)){
+                  imagePaths.sort(); //because of asyc pages we have to reSort pages
+                  resolve(imagePaths);
+                }
+              }).catch(function(error){
+                reject(error);
+              });
+            }
           }
         });
 
